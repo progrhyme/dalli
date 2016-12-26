@@ -232,6 +232,24 @@ module Dalli
     end
 
     ##
+    # Internal Ring object which bundles memcache servers and relays queries
+    # to servers.
+    def ring
+      @ring ||= Dalli::Ring.new(
+        @servers.map do |s|
+         server_options = {}
+          if s =~ %r{\Amemcached://}
+            uri = URI.parse(s)
+            server_options[:username] = uri.user
+            server_options[:password] = uri.password
+            s = "#{uri.host}:#{uri.port}"
+          end
+          Dalli::Server.new(s, @options.merge(server_options))
+        end, @options
+      )
+    end
+
+    ##
     ## Make sure memcache servers are alive, or raise an Dalli::RingError
     def alive!
       ring.server_for_key("")
@@ -334,21 +352,6 @@ module Dalli
       else
         return servers
       end
-    end
-
-    def ring
-      @ring ||= Dalli::Ring.new(
-        @servers.map do |s|
-         server_options = {}
-          if s =~ %r{\Amemcached://}
-            uri = URI.parse(s)
-            server_options[:username] = uri.user
-            server_options[:password] = uri.password
-            s = "#{uri.host}:#{uri.port}"
-          end
-          Dalli::Server.new(s, @options.merge(server_options))
-        end, @options
-      )
     end
 
     # Chokepoint method for instrumentation
